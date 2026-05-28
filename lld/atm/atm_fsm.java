@@ -194,9 +194,6 @@ class SelectOperationState implements ATMState{
     }
 }
 class TransactionState implements ATMState{
-    // public TransactionState(){
-    //     System.out.println("Transaction is processing, please wait and collect the cash!");
-    // }
     @Override
     public void printPrompt() {
         System.out.println("Transaction state. Enter amount.");
