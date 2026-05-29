@@ -174,18 +174,34 @@ class SnakeGame{
             (direction.equals("R") && newDirection.equals("L")))
                 return;
         //also can give values to direction and if sum becomes zero then don't change direction
+        if(!Set.of("U","D","L","R").contains(newDirection)) return;
         this.direction=newDirection;
     }
     public void printBoard(){
         for(int i=0;i<gameBoard.getHeight();i++){
+            //System.out.println("-------------------");
             System.out.print("| ");
             for(int j=0;j<gameBoard.getWidth();j++){
-                if(currentFood.getRow()==i && currentFood.getColumn()==j) System.out.print("f | ");
-                else if(snakeBody.contains(new Pair(i, j))) System.out.print("s | ");
+                Pair curr = new Pair(i, j);
+                if(currentFood.getRow()==i && currentFood.getColumn()==j) {
+                    if(currentFood instanceof NormalFood)
+                        System.out.print("N | ");
+                    else
+                        System.out.print("E | ");
+                }
+                else if(snakeBody.contains(curr)) {
+                    Pair head=snake.peekFirst();
+                    if(head.equals(curr)){
+                        System.out.print("S | ");
+                    }
+                    else System.out.print("s | ");
+                }
                 else System.out.print(". | ");
             }
             System.out.println();
+            System.out.println();
         }
+        System.out.println("Score: " + score);
     }
     public void start(){
         Scanner sc = new Scanner(System.in);
