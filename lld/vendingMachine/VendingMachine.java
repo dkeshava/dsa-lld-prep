@@ -43,6 +43,7 @@ class ItemShelf{
     public List<Item> getItems(){return items;}
     public void setItems(List<Item> items){
         this.items=items;
+        setSoldOut(items.isEmpty());
     }
     public boolean checkIsSoldOut(){
         return isSoldOut;
@@ -111,6 +112,7 @@ class Inventory{
                 else{
                     Item item=shelf.getItems().get(0);
                     shelf.removeItem(item);
+                    return;
                     //return item;
                 }
             }
@@ -168,7 +170,7 @@ class HasCoinsState implements VendingMachineState{
 class SelectionState implements VendingMachineState{
     @Override
     public void printPrompt(){
-        System.out.println("Please select item shelf code from which you want to buy.");
+        System.out.println("Item selected.");
     }
     @Override
     public String getStateName(){return "SelectionState";}
@@ -183,7 +185,7 @@ class SelectionState implements VendingMachineState{
 class DispenseState implements VendingMachineState{
     @Override
     public void printPrompt(){
-        System.out.println("Dispensing Item");
+        //System.out.println("Dispensing Item");
     }
     @Override
     public String getStateName(){return "DispenseState";}
@@ -197,10 +199,10 @@ class DispenseState implements VendingMachineState{
 class ReturnChangeState implements VendingMachineState{
     @Override
     public void printPrompt(){
-        System.out.println("Returning Change");
+        //System.out.println("Returning Change");
     }
     @Override
-    public String getStateName(){return "OutOfStockState";}
+    public String getStateName(){return "ReturnChangeState";}
     @Override
     public VendingMachineState next(VendingMachineContext context){
         if(context.getInventory().isInventoryOutOfStock())return new OutOfStockState();
@@ -213,7 +215,7 @@ class OutOfStockState implements VendingMachineState{
         System.out.println("OutOfStock");
     }
     @Override
-    public String getStateName(){return "DispenseState";}
+    public String getStateName(){return "OutOfStockState";}
     @Override
     public VendingMachineState next(VendingMachineContext context){
         if(context.getInventory().isInventoryOutOfStock()){
@@ -228,7 +230,7 @@ class VendingMachineContext{
     private VendingMachineState currentState;
     private Inventory inventory;
     private List<Coin> coinList;
-    private int selectedItemCode;
+    private int selectedItemCode=-1;
     private boolean purchaseApproved;
     private int changeAmount;
     public VendingMachineContext(int itemShelfCount){
@@ -255,7 +257,12 @@ class VendingMachineContext{
     public void selectItem(int codeNumber){
         if(currentState instanceof HasCoinsState){
             selectedItemCode=codeNumber;
-            advanceState();
+            currentState = new SelectionState();
+            System.out.println(
+                "current state: " + currentState.getStateName()
+            );
+            
+            currentState.printPrompt();
         }
     }
     public Item dispenseItem(){
@@ -266,21 +273,19 @@ class VendingMachineContext{
                 purchaseApproved= (item!=null) && (getTotalInsertedAmount()>=item.getPrice());
                 advanceState();
                 if(currentState instanceof DispenseState){
+                    System.out.println("Dispensed item: " + item.getType());
                     inventory.removeItem(selectedItemCode);
                     changeAmount=getTotalInsertedAmount()-item.getPrice();
                     advanceState();
                     if(currentState instanceof ReturnChangeState){
                         returnChange();
-                        coinList.clear();
-                        selectedItemCode = -1;
-                        changeAmount = 0;
-                        purchaseApproved=false;
+                        advanceState();
                     }
-                    advanceState();
-                    System.out.println(
-                        "Dispensed item: " + item.getType()
-                    );
+                    resetMachine();
                     return item;
+                }
+                else{
+                    System.out.println("Not enough Balance to dispense selected item!");
                 }
             } catch (Exception e) {
                 System.out.println("Error: " + e.getMessage());
@@ -288,6 +293,12 @@ class VendingMachineContext{
         }
         else System.out.println("Products can only be dispensed in dispensed state");
         return null;
+    }
+    private void resetMachine(){
+        coinList.clear();
+        selectedItemCode=-1;
+        changeAmount=0;
+        purchaseApproved=false;
     }
     private void returnChange(){
         System.out.println(
@@ -315,9 +326,9 @@ public class VendingMachine {
         vendingMachine.getInventory().getItemShelf(1).setItems(itemList2);
 
         vendingMachine.insertCoin(Coin.FIVE_RUPEES);
-        vendingMachine.insertCoin(Coin.FIVE_RUPEES);
-        vendingMachine.insertCoin(Coin.FIVE_RUPEES);
+        //vendingMachine.insertCoin(Coin.FIVE_RUPEES);
+        //vendingMachine.insertCoin(Coin.TEN_RUPEES);
         vendingMachine.selectItem(101);
-        // vendingMachine.dispenseItem();
+        vendingMachine.dispenseItem();
     }
 }
