@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+
 enum PieceType{
     KING,
     QUEEN,
@@ -40,6 +42,9 @@ abstract class Piece{
     }
     public Color getColor(){return color;}
     public abstract boolean canMove(Board board, Position source, Position destination);
+    public PieceType getPieceType(){
+        return pieceType;
+    }
 }
 class King extends Piece{
     public King(PieceType pieceType,Color color){
@@ -60,7 +65,7 @@ class Queen extends Piece{
     public boolean canMove(Board board, Position source, Position destination){
         int dr=Math.abs(source.getRow()-destination.getRow());
         int dc=Math.abs(source.getCol()-destination.getCol());
-        return (dr==dc) || ((dr==0) || (dc==0));
+        return ((dr==dc) || ((dr==0) || (dc==0))) && board.isPathClear(source, destination);
     }
 }
 class Rook extends Piece{
@@ -71,7 +76,7 @@ class Rook extends Piece{
     public boolean canMove(Board board, Position source, Position destination){
         int dr=Math.abs(source.getRow()-destination.getRow());
         int dc=Math.abs(source.getCol()-destination.getCol());
-        return (dr==0 || dc==0);
+        return (dr==0 || dc==0) && board.isPathClear(source, destination);
     }
 }
 class Bishop extends Piece{
@@ -82,7 +87,7 @@ class Bishop extends Piece{
     public boolean canMove(Board board, Position source, Position destination){
         int dr=Math.abs(source.getRow()-destination.getRow());
         int dc=Math.abs(source.getCol()-destination.getCol());
-        return (dr==dc);
+        return (dr==dc) && board.isPathClear(source, destination);
     }
 }
 class Knight extends Piece{
@@ -98,19 +103,30 @@ class Knight extends Piece{
     }
 }
 class Pawn extends Piece{
+    private boolean firstMove;
     public Pawn(PieceType pieceType,Color color){
         super(pieceType,color);
+        this.firstMove=true;
     }
     @Override
     public boolean canMove(Board board, Position source, Position destination){
         //assuming white is below and black is above
-        if(color==Color.BLACK){
-            //can't go above
-            return (source.getRow()-destination.getRow()==-1) && source.getCol()==destination.getCol();
+        int direction = (color == Color.WHITE) ? -1 : 1;
+        int rowDiff =destination.getRow() - source.getRow();
+        int colDiff =destination.getCol() - source.getCol();
+        Piece destinationPiece=board.getPiece(destination);
+        // Forward one
+        if(colDiff == 0 && rowDiff == direction && destinationPiece == null) return true;
+        //first move 2
+        if(firstMove && colDiff==0 && rowDiff==direction*2 ){
+            Position midrow=new Position(source.getRow()+direction, source.getCol());
+            if(board.getPiece(midrow)==null && board.getPiece(destination)==null) return true;
         }
-        else{
-            return (source.getRow()-destination.getRow()==1) && source.getCol()==destination.getCol();
-        }
+        // Diagonal capture
+        return Math.abs(colDiff)==1 && rowDiff==direction && destinationPiece!=null && destinationPiece.getColor()!=color;
+    }
+    public void setFirstMove(Boolean bool){
+        this.firstMove=bool;
     }
 }
 
@@ -146,6 +162,20 @@ class Board{
         setBishops();
         setKings();
         setQueens();
+    }
+    public boolean isPathClear(Position source, Position destination){
+        int rowStep=Integer.compare(destination.getRow(), source.getRow());
+        int colStep=Integer.compare(destination.getCol(), source.getCol());
+        int row=source.getRow()+rowStep;
+        int col=source.getCol()+colStep;
+        while(row!=destination.getRow() || col!=destination.getCol()){
+            if(board[row][col].getPiece()!=null){
+                return false;
+            }
+            row+=rowStep;
+            col+=colStep;
+        }
+        return true;
     }
     private void createCells(){
         for(int row=0;row<8;row++){
@@ -197,6 +227,37 @@ class Board{
         board[position.getRow()][position.getCol()]=cell;
     }
     public Piece getPiece(Position position){return board[position.getRow()][position.getCol()].getPiece();}
+    public Cell[][] getBoard(){return board;}
+    public void printBoard(){
+        for(int row=0; row<8; row++){
+            for(int col=0; col<8; col++){
+                Piece piece = board[row][col].getPiece();
+                if(piece == null){
+                    System.out.print(". ");
+                }
+                else{
+                    System.out.print(getSymbol(piece) + " ");
+                }
+            }
+            System.out.println();
+        }
+        System.out.println();
+    }
+    private String getSymbol(Piece piece){
+        String symbol="";
+        switch(piece.getPieceType()){
+            case KING -> symbol="K";
+            case QUEEN -> symbol="Q";
+            case ROOK -> symbol="R";
+            case BISHOP -> symbol="B";
+            case KNIGHT -> symbol="N";
+            case PAWN -> symbol="P";
+        }
+        if(piece.getColor()==Color.BLACK){
+            symbol=symbol.toLowerCase();
+        }
+        return symbol;
+    }
 }
 class Player{
     private String name;
@@ -229,12 +290,18 @@ class ChessGame{
     private Player blackPlayer;
     private Player currentPlayer;
     private GameStatus gameStatus;
+    private ArrayList<Move> moveHistory;
+    private ArrayList<Piece> whiteCapturedPieces;
+    private ArrayList<Piece> blackCapturedPieces;
     public ChessGame(Player whitePlayer, Player blackPlayer){
         this.board=new Board();
         this.whitePlayer=whitePlayer;
         this.blackPlayer=blackPlayer;
         this.currentPlayer=whitePlayer;
         this.gameStatus=GameStatus.IN_PROGRESS;
+        this.whiteCapturedPieces=new ArrayList<>();
+        this.blackCapturedPieces=new ArrayList<>();
+        this.moveHistory=new ArrayList<>();
     }
     public void makeMove(Move move){
         Position sourcePosition=move.getSource();
@@ -246,6 +313,7 @@ class ChessGame{
         if(sourcePosition.getRow()==destinationPosition.getRow()
             && sourcePosition.getCol()==destinationPosition.getCol()){
             System.out.println("please make a move");
+            return;
         }
         if(piece==null){
             System.out.println("Invalid Move! (no piece to move)");
@@ -266,9 +334,37 @@ class ChessGame{
         else{
             Piece sourcePiece=sourceCell.getPiece();
             sourceCell.setPiece(null);
+            if(destinationPiece!=null){
+                if(destinationPiece instanceof King){
+
+                    gameStatus =
+                        currentPlayer.getColor()==Color.WHITE
+                        ? GameStatus.WHITE_WIN
+                        : GameStatus.BLACK_WIN;
+                
+                    System.out.println("Game Over");
+                    return;
+                }
+                if(destinationPiece.getColor()==Color.WHITE){
+                    whiteCapturedPieces.add(destinationPiece);
+                }else{
+                    blackCapturedPieces.add(destinationPiece);
+                }
+            }
             destinationCell.setPiece(sourcePiece);
+            moveHistory.add(move);
+            if(piece instanceof Pawn){
+                ((Pawn) piece).setFirstMove(false);
+            }
+            //System.out.println("successfully moved the piece");
+            System.out.println(currentPlayer.getName()
+                + " moved from ("
+                + sourcePosition.getRow() + ","
+                + sourcePosition.getCol() + ") to ("
+                + destinationPosition.getRow() + ","
+                + destinationPosition.getCol() + ")");
             currentPlayer=(currentPlayer.getColor()==Color.BLACK)? whitePlayer: blackPlayer;
-            System.out.println("successfully moved the piece");
+            board.printBoard();
         }
     }
 }
@@ -288,5 +384,9 @@ public class chess_basic {
         chessGame.makeMove(move3);
         Move move4=new Move(new Position(6, 3), new Position(5, 3), dk);
         chessGame.makeMove(move4);
+        Move move5=new Move(new Position(1, 5), new Position(3, 5), dk);
+        chessGame.makeMove(move5);
+        Move move6=new Move(new Position(5, 2), new Position(3, 2), md);
+        chessGame.makeMove(move6);
     }
 }
