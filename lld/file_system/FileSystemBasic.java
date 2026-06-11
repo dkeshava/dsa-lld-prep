@@ -85,27 +85,88 @@ class FileSystem{
     public FileSystem(){
         this.root=new Directory("/");
     }
-    public void mkdir(String name){
-        root.addChild(name,new Directory(name));
+    public void mkdir(String path){
+        //if(!isValidPath(path)) return;
+        validatePath(path);
+        path=normalizePath(path);
+        Directory parentDir=traverseToParent(path);
+        String name=getLastPart(path);
+        parentDir.addChild(name, new Directory(name));
+        //root.addChild(name,new Directory(name));
     }
-    public void addFile(String name){
-        root.addChild(name, new File(name));
+    private void validatePath(String path){
+        if(path == null || path.isEmpty()){
+            throw new RuntimeException("Empty path");
+        }
+
+        if(!path.startsWith("/")){
+            throw new RuntimeException("Only absolute paths supported");
+        }
+        if(path.equals("/")){
+            throw new RuntimeException("Cannot create root");
+        }
     }
-    public void deleteFile(String name){
-        root.removeChild(name);
+    public void addFile(String path){
+        path=normalizePath(path);
+        Directory parentDir=traverseToParent(path);
+        String name=getLastPart(path);
+        parentDir.addChild(name, new File(name));
+    }
+    private String normalizePath(String path){
+        if(path.length()>1 && path.endsWith("/")){
+            path=path.substring(0,path.length()-1);
+        }
+        return path;
+    }
+    private String getLastPart(String path){
+        String[] parts = path.split("/");
+        return parts[parts.length-1];
+    }
+    public void deleteFile(String path){
+        path=normalizePath(path);
+        validatePath(path);
+        Directory parentDir=traverseToParent(path);
+        String name=getLastPart(path);
+        if(parentDir.getChild(name) instanceof Directory) throw new RuntimeException("Can't delete a directory");
+        if(parentDir.getChild(name) ==null) throw new RuntimeException("No such file exists");
+        parentDir.removeChild(name);
     }
     public void ls(){
         root.display(0);
+    }
+    // public boolean isValidPath(String path){
+    // }
+    private Directory traverseToParent(String path){
+        Directory current=root;
+        String[] parts = path.split("/");
+        for(int i=1;i<parts.length-1;i++){
+            FileSystemNode child=current.getChild(parts[i]);
+            if(child==null){
+                throw new RuntimeException("Invalid Path");
+            }
+            if(child.isFile()){
+                throw new RuntimeException("Can't traverse through a file");
+            }
+            current=(Directory) child;
+        }
+        return current;
     }
 }
 public class FileSystemBasic {
     public static void main(String[] args) {
         FileSystem fs=new FileSystem();
-        fs.mkdir("documents");
-        fs.mkdir("photos");
+        fs.mkdir("/documents");
+        fs.mkdir("/photos");
 
-        fs.addFile("resume.pdf");
-        fs.addFile("notes.txt");
+        fs.addFile("/resume.pdf");
+        fs.addFile("/notes.txt");
+        fs.mkdir("/documents/projects");
+
+        fs.addFile("/documents/projects/todo.txt");
+        fs.ls();
+        // fs.deleteFile("/documents/projects/");
+        // fs.ls();
+        fs.deleteFile("/documents/projects/toodo.txt");
         fs.ls();
     }
 }
