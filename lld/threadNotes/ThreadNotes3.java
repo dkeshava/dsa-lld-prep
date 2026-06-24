@@ -27,7 +27,7 @@ class SharedResource{
     public synchronized void makeAvailable(){
         available=true;
         System.out.println("Making resource available");
-        notify();
+        notifyAll();
     }
 }
 
